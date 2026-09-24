@@ -185,11 +185,16 @@ pip install -r requirements.txt
 
 ### 4. Place the dataset and trained model
 
-Put the supplied `guardgpt_dataset.jsonl` in `data/`. For backwards compatibility,
-the loader also accepts the project-root copy and the existing prebuilt
-`data/guardgpt_augmented_clean.json` plus FAISS artifacts. The trained
+Put the supplied `guardgpt_dataset.jsonl` in `data/` (the tracked root-level copy
+is accepted for backwards compatibility). The loader also accepts the existing
+prebuilt `data/guardgpt_augmented_clean.json` plus matching FAISS artifacts. The trained
 `intent_classifier/best_model.pt` and tokenizer files are loaded automatically;
 set `GUARDGPT_INTENT_MODEL` to override the checkpoint.
+
+Embedding models are loaded from the local Sentence-Transformers cache by default.
+To explicitly permit a first-run network download, set
+`GUARDGPT_ALLOW_MODEL_DOWNLOAD=1`; otherwise a missing local model fails clearly
+instead of attempting an implicit network request.
 
 ### 5. (Optional) Configure environment
 
@@ -289,16 +294,15 @@ python -m unittest discover -s tests -v
 Or one file at a time:
 
 ```bash
-python -m unittest tests.test_mcp_server
+python -m unittest tests.test_complete_http
 python -m unittest tests.test_mcp_client
 python -m unittest tests.test_agent
 python -m unittest tests.test_end_to_end
 ```
 
-> Note: `tests.test_mcp_server` and `tests.test_end_to_end` will build the
-> FAISS index on first run if `cache/guardgpt_faiss.index` is missing.
-> This takes ~30 minutes for the bundled dataset. Subsequent runs use the
-> cached index.
+> Note: integration tests use deterministic fixtures where possible. Production
+> JSONL loading builds an in-memory vector index; prebuilt deployments must
+> provide the dataset, FAISS index, and ID map together.
 
 ---
 
@@ -431,6 +435,7 @@ local model-backed acceptance check, verify that a safe prompt returns an answer
 with `output_audit` set to `PASSED`, blocked prompts make zero generation attempts,
 and disconnecting Ollama releases no answer.
 
-The loader expects `guardgpt_dataset.jsonl` in `data/` (or the path supplied by
-`GUARDGPT_DATASET`). A root-level copy is accepted for compatibility, as are
-the documented prebuilt JSON and FAISS artifacts.
+The loader expects `data/guardgpt_dataset.jsonl`, then falls back to the
+repository-root `guardgpt_dataset.jsonl` for compatibility. A path supplied by
+`GUARDGPT_DATASET` takes precedence. Prebuilt JSON and FAISS artifacts are also
+supported when all required files are present.

@@ -44,6 +44,7 @@ from agent.mcp_client import (  # noqa: E402
     MCPToolError,
     ToolResult,
     call_tool,
+    configured_server_url,
     list_tools,
     known_tool_names,
     run_mcp_tool,
@@ -257,11 +258,13 @@ class MCPClientModuleSurfaceTests(unittest.TestCase):
     def test_default_url_constant_is_defined(self) -> None:
         self.assertTrue(MCP_SERVER_URL.startswith("http://"))
 
-    def test_known_tool_names_lists_all_five(self) -> None:
+    def test_known_tool_names_lists_all_supported_tools(self) -> None:
         names = set(known_tool_names())
         self.assertEqual(
             names,
             {
+                "health",
+                "complete_request",
                 "prompt_analysis",
                 "jailbreak_detection",
                 "content_moderation",
@@ -269,6 +272,17 @@ class MCPClientModuleSurfaceTests(unittest.TestCase):
                 "audit_logger",
             },
         )
+
+    def test_default_url_reads_environment_at_call_time(self) -> None:
+        previous = os.environ.get("GUARDGPT_MCP_URL")
+        try:
+            os.environ["GUARDGPT_MCP_URL"] = "http://127.0.0.1:9123/mcp"
+            self.assertEqual(configured_server_url(), "http://127.0.0.1:9123/mcp")
+        finally:
+            if previous is None:
+                os.environ.pop("GUARDGPT_MCP_URL", None)
+            else:
+                os.environ["GUARDGPT_MCP_URL"] = previous
 
 
 def _run_live() -> None:
