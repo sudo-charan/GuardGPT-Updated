@@ -9,6 +9,10 @@ venv/
 
 # Dataset, models, cache (large / generated)
 data/
+!data/
+data/*
+!data/.gitkeep
+!data/README.md
 cache/
 models/
 !mcp_server/models/
@@ -20,6 +24,9 @@ harm_only_400k_dataset.json
 
 # Audit logs
 logs/
+!logs/
+logs/*
+!logs/.gitkeep
 *.jsonl
 
 # Environment / secrets

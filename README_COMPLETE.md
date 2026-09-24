@@ -1,8 +1,9 @@
 # GuardGPT complete local pipeline
 
 This version connects the existing prompt guard to local Ollama generation and
-a separate structured output review. It uses the supplied `guardgpt_dataset.jsonl`
-when present, the trained `intent_classifier/best_model.pt` safety head, and the
+a separate structured output review. It uses the supplied
+`data/guardgpt_dataset.jsonl` when present, the trained
+`intent_classifier/best_model.pt` safety head, and the
 existing normalized all-MiniLM-L6-v2 artifacts when available. No model is
 trained at runtime.
 
@@ -145,9 +146,10 @@ they do not measure a real model's judgement. Historical test files for the form
 report-only CLI remain in the source; some require a Windows virtual environment,
 live models or the retired CLI helper. They are not the maintained suite.
 
-Place `guardgpt_dataset.jsonl` in the project root (or set `GUARDGPT_DATASET` to
-its path). The loader accepts JSONL records with `input_text`, `prompt`, `text`,
-or `request` text fields and preserves existing safety/category fields.
+Place `guardgpt_dataset.jsonl` in `data/` (or set `GUARDGPT_DATASET` to its path).
+For compatibility, a root-level copy is also accepted. The loader accepts JSONL
+records with `input_text`, `prompt`, `text`, or `request` text fields and
+preserves existing safety/category fields.
 The editing environment did not have your real dataset or an installed Ollama
 model. Rerun the checks after installing both.
 The final model-backed acceptance check must run on your laptop. Confirm response
