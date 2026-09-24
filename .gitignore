@@ -11,6 +11,10 @@ venv/
 data/
 cache/
 models/
+!mcp_server/models/
+mcp_server/models/*
+!mcp_server/models/__init__.py
+!mcp_server/models/schemas.py
 harm_only_400k_dataset.json
 *.index
 

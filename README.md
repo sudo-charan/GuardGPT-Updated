@@ -180,10 +180,12 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Place the dataset
+### 4. Place the dataset and trained model
 
-Put `harm_only_400k_dataset.json` in the `data/` directory. On first use the
-`DatasetLoader` will build the FAISS index and cache it under `cache/`.
+Put the supplied `guardgpt_dataset.jsonl` in the project root. The loader also
+supports the existing prebuilt `data/guardgpt_augmented_clean.json` plus FAISS
+artifacts. The trained `intent_classifier/best_model.pt` and tokenizer files
+are loaded automatically; set `GUARDGPT_INTENT_MODEL` to override the checkpoint.
 
 ### 5. (Optional) Configure environment
 

@@ -23,8 +23,17 @@ DEMO = [
 def status():
     from core.llama_backend import LlamaBackend
     import requests
-    result = {"data_files": {name: (ROOT / "data" / name).is_file() for name in (
-        "guardgpt_augmented_clean.json", "guardgpt_faiss.index", "guardgpt_id_map.json")}}
+    jsonl = Path(os.getenv("GUARDGPT_DATASET", ROOT / "guardgpt_dataset.jsonl"))
+    result = {"data_files": {
+        "dataset": jsonl.is_file() or (ROOT / "data" / "guardgpt_augmented_clean.json").is_file(),
+        "trained_intent_model": (ROOT / "intent_classifier" / "best_model.pt").is_file(),
+        "tokenizer": (ROOT / "intent_classifier" / "tokenizer.json").is_file(),
+    }}
+    # Prebuilt FAISS deployments retain these optional artifacts.
+    result["prebuilt_index_files"] = {
+        name: (ROOT / "data" / name).is_file()
+        for name in ("guardgpt_faiss.index", "guardgpt_id_map.json")
+    }
     backend = LlamaBackend()
     result["generation_model"] = backend.model
     result["audit_model"] = os.getenv("OLLAMA_AUDIT_MODEL") or backend.model
