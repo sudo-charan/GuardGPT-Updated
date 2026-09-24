@@ -34,7 +34,12 @@ from mcp.client.streamable_http import streamable_http_client
 logger = logging.getLogger(__name__)
 
 
-MCP_SERVER_URL = os.getenv("GUARDGPT_MCP_URL", "http://127.0.0.1:8000/mcp")
+MCP_SERVER_URL = "http://127.0.0.1:8000/mcp"
+
+
+def configured_server_url() -> str:
+    """Read the endpoint at call time so runtime configuration changes apply."""
+    return os.getenv("GUARDGPT_MCP_URL", MCP_SERVER_URL)
 
 
 # ============================================================
@@ -78,9 +83,10 @@ async def _call_mcp_tool_async(
     tool_name: str,
     arguments: dict[str, Any],
     *,
-    url: str = MCP_SERVER_URL,
+    url: Optional[str] = None,
     read_timeout_seconds: Optional[float] = None,
 ) -> ToolResult:
+    url = url or configured_server_url()
     try:
         local = urlparse(url).hostname in {"127.0.0.1", "localhost", "::1"}
         async with httpx.AsyncClient(timeout=httpx.Timeout(read_timeout_seconds or 900), trust_env=not local) as http_client, streamable_http_client(url, http_client=http_client) as streams:
@@ -121,8 +127,9 @@ async def _call_mcp_tool_async(
 
 async def _list_mcp_tools_async(
     *,
-    url: str = MCP_SERVER_URL,
+    url: Optional[str] = None,
 ) -> list[str]:
+    url = url or configured_server_url()
     try:
         local = urlparse(url).hostname in {"127.0.0.1", "localhost", "::1"}
         async with httpx.AsyncClient(trust_env=not local) as http_client, streamable_http_client(url, http_client=http_client) as streams:
@@ -221,7 +228,7 @@ def call_tool(
     tool_name: str,
     arguments: dict[str, Any],
     *,
-    url: str = MCP_SERVER_URL,
+    url: Optional[str] = None,
     read_timeout_seconds: Optional[float] = None,
 ) -> ToolResult:
     """Synchronously call an MCP tool and return a `ToolResult`."""
@@ -262,7 +269,7 @@ def run_mcp_tool(
     tool_name: str,
     arguments: dict[str, Any],
     *,
-    url: str = MCP_SERVER_URL,
+    url: Optional[str] = None,
 ) -> dict[str, Any]:
     """
     Backwards-compatible sync helper.
@@ -277,6 +284,8 @@ def run_mcp_tool(
 def known_tool_names() -> Iterable[str]:
     """Return the canonical GuardGPT tool names handled by the MCP server."""
     return (
+        "health",
+        "complete_request",
         "prompt_analysis",
         "jailbreak_detection",
         "content_moderation",
@@ -287,6 +296,7 @@ def known_tool_names() -> Iterable[str]:
 
 __all__ = [
     "MCP_SERVER_URL",
+    "configured_server_url",
     "MCPClientError",
     "MCPConnectionError",
     "MCPToolError",

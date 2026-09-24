@@ -35,6 +35,19 @@ RECORDS_PATH = PROJECT_ROOT / "data" / "guardgpt_id_map.json"
 MODEL_NAME = "all-MiniLM-L6-v2"
 
 
+def _load_embedding_model(model_name: str) -> SentenceTransformer:
+    """Load locally by default; network downloads require explicit opt-in."""
+    try:
+        return SentenceTransformer(model_name, local_files_only=True)
+    except Exception as error:
+        if os.getenv("GUARDGPT_ALLOW_MODEL_DOWNLOAD", "").lower() not in {"1", "true", "yes"}:
+            raise RuntimeError(
+                f"Embedding model '{model_name}' is not available locally. "
+                "Set GUARDGPT_ALLOW_MODEL_DOWNLOAD=1 to permit a download."
+            ) from error
+        return SentenceTransformer(model_name)
+
+
 class DatasetLoader:
     """Loads dataset and executes vector search via Sentence-BERT + FAISS."""
 
@@ -98,10 +111,7 @@ class DatasetLoader:
             raise ValueError("JSONL dataset is empty.")
         if self.max_records is not None:
             records = records[: self.max_records]
-        try:
-            model = SentenceTransformer(self._model_name, local_files_only=True)
-        except Exception:
-            model = SentenceTransformer(self._model_name)
+        model = _load_embedding_model(self._model_name)
         embeddings = model.encode(
             [record["input_text"] for record in records],
             convert_to_numpy=True,
@@ -136,9 +146,9 @@ class DatasetLoader:
             raise ValueError("Dataset must be a nonempty JSON list.")
         if not isinstance(mapping, dict):
             raise ValueError("ID map must be a dictionary keyed by vector number.")
-        index = faiss.read_index(str(index_path))
         if faiss is None:
             raise RuntimeError("FAISS is required for prebuilt dataset artifacts.")
+        index = faiss.read_index(str(index_path))
         if not isinstance(index, faiss.IndexFlatIP) or index.d != 384:
             raise ValueError("Expected a 384-dimensional IndexFlatIP index.")
         if index.ntotal != len(dataset) or set(mapping) != {str(i) for i in range(index.ntotal)}:
@@ -178,10 +188,7 @@ class DatasetLoader:
         for i in np.linspace(0, index.ntotal - 1, min(100, index.ntotal), dtype=int):
             if not np.isclose(np.linalg.norm(index.reconstruct(int(i))), 1.0, atol=1e-3):
                 raise ValueError("Index vectors must be L2 normalized.")
-        try:
-            model = SentenceTransformer(self._model_name, local_files_only=True)
-        except Exception:
-            model = SentenceTransformer(self._model_name)
+        model = _load_embedding_model(self._model_name)
         dimension_method = getattr(model, "get_embedding_dimension", None) or model.get_sentence_embedding_dimension
         if dimension_method() != index.d:
             raise ValueError("Embedding model dimension does not match index.")

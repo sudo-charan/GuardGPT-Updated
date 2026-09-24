@@ -131,9 +131,11 @@ def _port_reachable(url: str) -> bool:
         return False
     if not parsed.hostname or not parsed.port:
         return False
+    family = socket.AF_INET6 if ":" in parsed.hostname else socket.AF_INET
+    address = (parsed.hostname, parsed.port, 0, 0) if family == socket.AF_INET6 else (parsed.hostname, parsed.port)
     try:
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as sock:
+        with closing(socket.socket(family, socket.SOCK_STREAM)) as sock:
             sock.settimeout(1.0)
-            return sock.connect_ex((parsed.hostname, parsed.port)) == 0
+            return sock.connect_ex(address) == 0
     except OSError:
         return False

@@ -112,6 +112,13 @@ class IntegrationTests(unittest.TestCase):
         with self.assertRaises(FileNotFoundError):
             self.loader(path)
 
+    def test_model_download_requires_explicit_opt_in(self):
+        module = importlib.import_module("core.dataset_loader")
+        with patch.object(module, "SentenceTransformer", side_effect=OSError("offline")):
+            with patch.dict("os.environ", {"GUARDGPT_ALLOW_MODEL_DOWNLOAD": ""}, clear=False):
+                with self.assertRaisesRegex(RuntimeError, "not available locally"):
+                    module._load_embedding_model("missing-model")
+
     def test_changed_mapping_rejected(self):
         path = self.artifacts()
         mapping_path = self.root / "guardgpt_id_map.json"
