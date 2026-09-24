@@ -361,3 +361,76 @@ python -m unittest tests.test_end_to_end
 | GuardGPT Core | **Actual safety / classification engine** |
 | Decision Engine | **Final ALLOW / SANITIZE / BLOCK authority** |
 | Audit Logger | **Record of the completed analysis and decision** |
+
+---
+
+## Complete request pipeline
+
+When using the complete request path, GuardGPT:
+
+1. Rejects empty or oversized input.
+2. Classifies intent, queries the validated dataset, and detects override patterns.
+3. Decides `ALLOW`, `SANITIZE`, or `BLOCK`, including session safety history.
+4. Skips generation for blocked prompts. Self-harm concerns receive a fixed supportive response.
+5. Rewrites sanitizeable prompts for educational or defensive use, then rechecks the rewrite.
+6. Generates an answer only from the allowed original or rechecked rewrite.
+7. Audits the candidate in a separate structured model call. Unsafe or irrelevant answers allow one regeneration and another audit.
+8. Writes one final audit event before returning the answer. A log failure withholds the answer.
+
+The supported MCP entry point is `complete_request`. The CLI uses it, and the legacy
+`GuardEngine` delegates to the same implementation. The original five MCP tools and
+LangGraph report-only workflow remain available for compatibility.
+
+## Ollama setup
+
+Ollama is required for answer generation, rewrites, and output review. Install it
+from [ollama.com/download/windows](https://ollama.com/download/windows), then run:
+
+```powershell
+ollama list
+ollama pull llama3
+```
+
+Start the Ollama application, or run `ollama serve` if no server is running. The
+defaults are `http://127.0.0.1:11434`, model `llama3`, and a 120-second timeout.
+Set `OLLAMA_MODEL` in `.env` to use another installed model; `OLLAMA_AUDIT_MODEL`
+can optionally select a separate review model. Do not expose the local service
+publicly.
+
+## Complete request reports
+
+Complete requests return a structured report containing fields such as:
+
+- `response`: only the audited answer or a fixed supportive response.
+- `input_action`: the input decision, separate from the final outcome.
+- `action`: final routing; `SANITIZE` means a rewrite was used.
+- `final_status`: `SAFE`, `UNSAFE`, `SUPPORT`, `INVALID_INPUT`, or `ERROR`.
+- `output_audit`: `NOT_RUN`, `PASSED`, `FAILED`, `ERROR`, or a support-response status.
+- `allowed`: whether generated content can be released.
+- `category_scores` and `matched_category_scores`: effective evidence and nearest-dataset labels.
+- `detected_attacks`: attack and pattern labels; explanations remain in `reasons`.
+
+Prompt, rewritten prompt, and returned text are hashed in complete-request audit
+metadata rather than stored as raw content. Rejected candidates are never persisted
+or returned. Requests are serialized for consistent session state, and one bounded
+retry is used for failed output audits. This is an executable safety system, not a
+proven safety guarantee; model and dataset quality still require human evaluation.
+
+## Maintained validation
+
+Run the maintained offline regression suite with:
+
+```powershell
+python run_tests.py
+```
+
+It covers dataset and risk checks, generation, audit and rewrite failure cases,
+local MCP HTTP behavior, and an Ollama-shaped HTTP fixture. Fixture outputs are
+deterministic and do not measure the judgement quality of a real model. For a
+local model-backed acceptance check, verify that a safe prompt returns an answer
+with `output_audit` set to `PASSED`, blocked prompts make zero generation attempts,
+and disconnecting Ollama releases no answer.
+
+The loader expects `guardgpt_dataset.jsonl` in `data/` (or the path supplied by
+`GUARDGPT_DATASET`). A root-level copy is accepted for compatibility, as are
+the documented prebuilt JSON and FAISS artifacts.

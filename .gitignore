@@ -14,6 +14,10 @@ data/*
 !data/.gitkeep
 !data/README.md
 cache/
+!cache/
+cache/*
+!cache/.gitkeep
+!cache/README.md
 models/
 !mcp_server/models/
 mcp_server/models/*
@@ -27,6 +31,7 @@ logs/
 !logs/
 logs/*
 !logs/.gitkeep
+!logs/README.md
 *.jsonl
 
 # Environment / secrets
