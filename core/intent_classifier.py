@@ -14,8 +14,10 @@
 # ============================================================
 
 import logging
+import os
 import re
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Dict, List, Optional
 
 import numpy as np
@@ -160,6 +162,10 @@ class IntentClassifier:
         self._intent_embeddings = None
         self._intent_names = []
         self._initialized = False
+        self._trained_labels: list[str] = []
+        self._trained_head = None
+        self._trained_encoder = None
+        self._trained_loaded = False
 
     def _load_model(self) -> None:
         """Load Sentence-BERT model if not already loaded."""
@@ -170,6 +176,64 @@ class IntentClassifier:
             self._model = SentenceTransformer(self.model_name, local_files_only=True)
         except Exception:
             self._model = SentenceTransformer(self.model_name)
+
+    def _load_trained_safety_model(self) -> None:
+        """Load the supplied classifier head on the already-loaded encoder."""
+        if self._trained_loaded:
+            return
+        self._trained_loaded = True
+        checkpoint_path = Path(os.getenv(
+            "GUARDGPT_INTENT_MODEL",
+            Path(__file__).resolve().parents[1] / "intent_classifier" / "best_model.pt",
+        ))
+        if not checkpoint_path.is_file():
+            return
+        try:
+            import torch
+            checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+            labels = checkpoint.get("labels")
+            state = checkpoint.get("model_state_dict")
+            if not isinstance(labels, list) or not isinstance(state, dict):
+                return
+            encoder = getattr(self._model[0], "auto_model", None)
+            if encoder is None:
+                return
+            encoder_state = {
+                key.removeprefix("encoder."): value
+                for key, value in state.items()
+                if key.startswith("encoder.")
+            }
+            encoder.load_state_dict(encoder_state, strict=False)
+            output = state.get("classifier.weight")
+            bias = state.get("classifier.bias")
+            if output is None or bias is None:
+                return
+            head = torch.nn.Linear(output.shape[1], output.shape[0])
+            head.load_state_dict({"weight": output, "bias": bias})
+            head.eval()
+            encoder.eval()
+            self._trained_labels = [str(label) for label in labels]
+            self._trained_encoder = encoder
+            self._trained_head = head
+            logger.info("Loaded trained intent safety model from %s", checkpoint_path)
+        except Exception as error:
+            logger.warning("Trained intent model unavailable; using semantic fallback: %s", error)
+
+    def _trained_classify(self, text: str) -> tuple[str, float] | None:
+        if self._trained_head is None or self._trained_encoder is None:
+            return None
+        try:
+            import torch
+            tokenizer = getattr(self._model, "tokenizer", None) or self._model[0].tokenizer
+            encoded = tokenizer(text, return_tensors="pt", truncation=True, max_length=256)
+            with torch.no_grad():
+                pooled = self._trained_encoder(**encoded).pooler_output
+                probabilities = torch.softmax(self._trained_head(pooled), dim=-1)[0]
+            index = int(torch.argmax(probabilities))
+            return self._trained_labels[index], float(probabilities[index])
+        except Exception as error:
+            logger.warning("Trained intent inference failed; using semantic fallback: %s", error)
+            return None
 
     def _initialize(self) -> None:
         """Generate prototype embeddings for all defined intents."""
@@ -222,6 +286,7 @@ class IntentClassifier:
             }
 
         self._initialize()
+        self._load_trained_safety_model()
 
         # Encode user prompt
         query_embedding = self._model.encode(
@@ -325,6 +390,17 @@ class IntentClassifier:
             best_intent = "educational"
             confidence = 0.80
 
+        trained = self._trained_classify(text)
+        trained_map = {
+            "prompt_injection": "prompt_injection",
+            "jailbreak": "jailbreak",
+            "harmful_instructions": "harmful",
+            "self_harm_risk": "self_harm",
+        }
+        if trained and trained[0] in trained_map and trained[1] >= 0.65 and not is_safe_tech:
+            best_intent = trained_map[trained[0]]
+            confidence = round(trained[1], 4)
+
 
 
         return {
@@ -405,3 +481,7 @@ class IntentClassifier:
         self._intent_embeddings = None
         self._intent_names = []
         self._initialized = False
+        self._trained_labels = []
+        self._trained_head = None
+        self._trained_encoder = None
+        self._trained_loaded = False
