@@ -23,9 +23,10 @@ DEMO = [
 def status():
     from core.llama_backend import LlamaBackend
     import requests
-    jsonl = Path(os.getenv("GUARDGPT_DATASET", ROOT / "guardgpt_dataset.jsonl"))
+    jsonl = Path(os.getenv("GUARDGPT_DATASET", ROOT / "data" / "guardgpt_dataset.jsonl"))
+    root_jsonl = ROOT / "guardgpt_dataset.jsonl"
     result = {"data_files": {
-        "dataset": jsonl.is_file() or (ROOT / "data" / "guardgpt_augmented_clean.json").is_file(),
+        "dataset": jsonl.is_file() or root_jsonl.is_file() or (ROOT / "data" / "guardgpt_augmented_clean.json").is_file(),
         "trained_intent_model": (ROOT / "intent_classifier" / "best_model.pt").is_file(),
         "tokenizer": (ROOT / "intent_classifier" / "tokenizer.json").is_file(),
     }}

@@ -123,7 +123,10 @@ GuardGPT/
 │   └── dataset_schema_v2.json
 │
 ├── data/
-│   └── harm_only_400k_dataset.json        # canonical dataset location
+│   ├── guardgpt_dataset.jsonl             # canonical local dataset location
+│   ├── guardgpt_augmented_clean.json      # optional prebuilt dataset
+│   ├── guardgpt_faiss.index               # optional prebuilt vector index
+│   └── guardgpt_id_map.json               # optional prebuilt vector map
 │
 ├── logs/
 │   └── guardgpt_audit.jsonl               # canonical JSONL audit log
@@ -182,10 +185,11 @@ pip install -r requirements.txt
 
 ### 4. Place the dataset and trained model
 
-Put the supplied `guardgpt_dataset.jsonl` in the project root. The loader also
-supports the existing prebuilt `data/guardgpt_augmented_clean.json` plus FAISS
-artifacts. The trained `intent_classifier/best_model.pt` and tokenizer files
-are loaded automatically; set `GUARDGPT_INTENT_MODEL` to override the checkpoint.
+Put the supplied `guardgpt_dataset.jsonl` in `data/`. For backwards compatibility,
+the loader also accepts the project-root copy and the existing prebuilt
+`data/guardgpt_augmented_clean.json` plus FAISS artifacts. The trained
+`intent_classifier/best_model.pt` and tokenizer files are loaded automatically;
+set `GUARDGPT_INTENT_MODEL` to override the checkpoint.
 
 ### 5. (Optional) Configure environment
 

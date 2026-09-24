@@ -23,7 +23,7 @@ from pathlib import Path
 # sys.path so the following `models.*` imports resolve correctly.
 import mcp_server  # noqa: F401
 
-from models.schemas import (  # noqa: E402
+from mcp_server.models.schemas import (  # noqa: E402
     AuditLoggerInput,
     AuditLoggerOutput,
 )

@@ -20,7 +20,7 @@ from functools import lru_cache
 # sys.path so the following imports resolve correctly.
 import mcp_server  # noqa: F401
 
-from models.schemas import (  # noqa: E402
+from mcp_server.models.schemas import (  # noqa: E402
     JailbreakDetectionInput,
     JailbreakDetectionOutput,
 )

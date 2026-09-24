@@ -63,6 +63,9 @@ class DecisionInput(WireModel):
     intent: str = "unknown"
     intent_confidence: float = 0.0
     risk_level: str = "safe"
+    evidence: list[str] = Field(default_factory=list)
+    reason_codes: list[str] = Field(default_factory=list)
+    requires_jailbreak_check: StrictBool = False
     dataset_match_confidence: float = 0.0
     matched_record_id: str | None = None
     matched_record_intent: str | None = None

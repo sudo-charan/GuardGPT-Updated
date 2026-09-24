@@ -15,11 +15,18 @@ from sentence_transformers import SentenceTransformer
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-_JSONL_DATASET = PROJECT_ROOT / "guardgpt_dataset.jsonl"
+_JSONL_DATASET = PROJECT_ROOT / "data" / "guardgpt_dataset.jsonl"
+_ROOT_JSONL_DATASET = PROJECT_ROOT / "guardgpt_dataset.jsonl"
 DATASET_PATH = Path(
     os.getenv(
         "GUARDGPT_DATASET",
-        str(_JSONL_DATASET if _JSONL_DATASET.is_file() else PROJECT_ROOT / "data" / "guardgpt_augmented_clean.json"),
+        str(
+            _JSONL_DATASET
+            if _JSONL_DATASET.is_file()
+            else _ROOT_JSONL_DATASET
+            if _ROOT_JSONL_DATASET.is_file()
+            else PROJECT_ROOT / "data" / "guardgpt_augmented_clean.json"
+        ),
     )
 )
 CACHE_DIR = PROJECT_ROOT / "cache"
