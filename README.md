@@ -123,7 +123,7 @@ GuardGPT/
 │   └── dataset_schema_v2.json
 │
 ├── data/
-│   ├── guardgpt_dataset.jsonl             # canonical local dataset location
+│   ├── guardgpt_dataset.jsonl             # preferred local dataset location
 │   ├── guardgpt_augmented_clean.json      # optional prebuilt dataset
 │   ├── guardgpt_faiss.index               # optional prebuilt vector index
 │   └── guardgpt_id_map.json               # optional prebuilt vector map
@@ -150,11 +150,16 @@ GuardGPT/
 
 | Tool | Purpose | Reuses |
 |------|---------|--------|
+| `health` | reports server readiness and pipeline support | MCP server runtime |
+| `complete_request` | canonical check, generation, output audit, and logging pipeline | complete GuardGPT pipeline |
 | `prompt_analysis` | intent / risk / category scores / evidence / reason codes | `core.intent_classifier.IntentClassifier`, `core.dataset_loader.DatasetLoader` |
 | `jailbreak_detection` | detected / attack_type / patterns / confidence / reasons | `core.intent_classifier.IntentClassifier` + deterministic pattern hints |
 | `content_moderation` | categories / severity / risk_level / reasons | `core.intent_classifier.IntentClassifier` + dataset category scores |
 | `decision` | ALLOW / SANITIZE / BLOCK + reasons + sanitized_prompt | `core.decision_engine.DecisionEngine` |
 | `audit_logger` | appends to `logs/guardgpt_audit.jsonl` | append-only JSONL writer (backward-compatible schema) |
+
+`complete_request` is the supported application entry point. The five report-only
+tools remain available for compatibility with existing MCP clients.
 
 ---
 
@@ -207,8 +212,10 @@ Available environment variables:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `GUARDGPT_MCP_URL` | `http://127.0.0.1:8000/mcp` | MCP server endpoint the Agent connects to |
+| `GUARDGPT_MCP_URL` | `http://127.0.0.1:8000/mcp` | MCP server endpoint the Agent connects to; read at request time |
 | `GUARDGPT_PROJECT_ROOT` | auto-detected | Project root for `logs/` and `data/` resolution |
+| `GUARDGPT_DATASET` | auto-detected | Optional dataset path override |
+| `GUARDGPT_ALLOW_MODEL_DOWNLOAD` | disabled | Set to `1` to allow downloading a missing embedding model |
 | `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama backend used by the legacy GuardEngine |
 | `OLLAMA_MODEL` | `llama3` | Ollama model |
 | `OLLAMA_TIMEOUT` | `120` | Ollama request timeout (seconds) |
@@ -382,7 +389,7 @@ When using the complete request path, GuardGPT:
 8. Writes one final audit event before returning the answer. A log failure withholds the answer.
 
 The supported MCP entry point is `complete_request`. The CLI uses it, and the legacy
-`GuardEngine` delegates to the same implementation. The original five MCP tools and
+`GuardEngine` delegates to the same implementation. The original five report-only tools and
 LangGraph report-only workflow remain available for compatibility.
 
 ## Ollama setup
@@ -429,8 +436,8 @@ python run_tests.py
 ```
 
 It covers dataset and risk checks, generation, audit and rewrite failure cases,
-local MCP HTTP behavior, and an Ollama-shaped HTTP fixture. Fixture outputs are
-deterministic and do not measure the judgement quality of a real model. For a
+local MCP HTTP behavior, endpoint configuration, and an Ollama-shaped HTTP fixture.
+Fixture outputs are deterministic and do not measure the judgement quality of a real model. For a
 local model-backed acceptance check, verify that a safe prompt returns an answer
 with `output_audit` set to `PASSED`, blocked prompts make zero generation attempts,
 and disconnecting Ollama releases no answer.
