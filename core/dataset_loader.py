@@ -79,8 +79,39 @@ class DatasetLoader:
             self._load_prebuilt()
 
     def _load_jsonl(self) -> None:
-        """Load the supplied JSONL dataset and build an in-memory vector index."""
+        """Load JSONL records and use matching prebuilt artifacts when present."""
         start = time.monotonic()
+        records = self._read_jsonl_records()
+        index_path = self._path.parent / "guardgpt_faiss.index"
+        map_path = self._path.parent / "guardgpt_id_map.json"
+        artifacts = (index_path.is_file(), map_path.is_file())
+        if any(artifacts):
+            if not all(artifacts):
+                raise FileNotFoundError(
+                    "JSONL prebuilt artifacts must be supplied together: "
+                    f"{index_path} and {map_path}"
+                )
+            if self.max_records is not None:
+                raise ValueError("max_records is unsupported for a prebuilt index.")
+            self._load_jsonl_prebuilt(records, index_path, map_path, start)
+            return
+
+        model = _load_embedding_model(self._model_name)
+        embeddings = model.encode(
+            [record["input_text"] for record in records],
+            convert_to_numpy=True,
+            normalize_embeddings=True,
+        ).astype("float32")
+        self._model, self._records, self._texts = model, records, [r["input_text"] for r in records]
+        self._embeddings = embeddings
+        self._index = faiss.IndexFlatIP(embeddings.shape[1]) if faiss is not None else None
+        if self._index is not None:
+            self._index.add(embeddings)
+        self._load_time = time.monotonic() - start
+        self._loaded = True
+        logger.info("Loaded JSONL dataset: %d records", len(records))
+
+    def _read_jsonl_records(self) -> list[dict]:
         if not self._path.is_file():
             raise FileNotFoundError(f"Required dataset artifact missing: {self._path}")
         records = []
@@ -111,20 +142,62 @@ class DatasetLoader:
             raise ValueError("JSONL dataset is empty.")
         if self.max_records is not None:
             records = records[: self.max_records]
+        return records
+
+    def _load_jsonl_prebuilt(
+        self,
+        dataset: list[dict],
+        index_path: Path,
+        map_path: Path,
+        start: float,
+    ) -> None:
+        if self._model_name not in {MODEL_NAME, f"sentence-transformers/{MODEL_NAME}"}:
+            raise ValueError(f"This index requires {MODEL_NAME}.")
+        if faiss is None:
+            raise RuntimeError("FAISS is required for prebuilt dataset artifacts.")
+        with map_path.open(encoding="utf-8-sig") as file:
+            mapping = json.load(file)
+        if not isinstance(mapping, dict):
+            raise ValueError("ID map must be a dictionary keyed by vector number.")
+        index = faiss.read_index(str(index_path))
+        if not isinstance(index, faiss.IndexFlatIP) or index.d != 384:
+            raise ValueError("Expected a 384-dimensional IndexFlatIP index.")
+        expected_keys = {str(i) for i in range(index.ntotal)}
+        if index.ntotal != len(dataset) or set(mapping) != expected_keys:
+            raise ValueError("Dataset, index and ID-map counts/keys do not match.")
+
+        by_id = {}
+        for record in dataset:
+            rid = record.get("request_id")
+            if not isinstance(rid, str) or not rid or rid in by_id:
+                raise ValueError("JSONL request_id values must be unique nonempty strings.")
+            by_id[rid] = record
+        ordered_records = []
+        seen = set()
+        for position in range(index.ntotal):
+            record = mapping[str(position)]
+            if not isinstance(record, dict):
+                raise ValueError("Each ID-map value must be a full dataset record.")
+            rid = record.get("request_id")
+            if not isinstance(rid, str) or rid in seen or by_id.get(rid) != record:
+                raise ValueError("ID map has duplicate, missing or changed dataset records.")
+            seen.add(rid)
+            ordered_records.append(record)
+        if seen != set(by_id):
+            raise ValueError("ID map does not cover every JSONL dataset record.")
+
+        for position in np.linspace(0, index.ntotal - 1, min(100, index.ntotal), dtype=int):
+            if not np.isclose(np.linalg.norm(index.reconstruct(int(position))), 1.0, atol=1e-3):
+                raise ValueError("Index vectors must be L2 normalized.")
         model = _load_embedding_model(self._model_name)
-        embeddings = model.encode(
-            [record["input_text"] for record in records],
-            convert_to_numpy=True,
-            normalize_embeddings=True,
-        ).astype("float32")
-        self._model, self._records, self._texts = model, records, [r["input_text"] for r in records]
-        self._embeddings = embeddings
-        self._index = faiss.IndexFlatIP(embeddings.shape[1]) if faiss is not None else None
-        if self._index is not None:
-            self._index.add(embeddings)
+        dimension_method = getattr(model, "get_embedding_dimension", None) or model.get_sentence_embedding_dimension
+        if dimension_method() != index.d:
+            raise ValueError("Embedding model dimension does not match index.")
+        self._model, self._index, self._records = model, index, ordered_records
+        self._texts = [record["input_text"] for record in ordered_records]
         self._load_time = time.monotonic() - start
         self._loaded = True
-        logger.info("Loaded JSONL dataset: %d records", len(records))
+        logger.info("Loaded validated JSONL prebuilt index: %d records", len(ordered_records))
 
     def _load_prebuilt(self) -> None:
         """Validate the three artifacts before publishing any loaded state."""
