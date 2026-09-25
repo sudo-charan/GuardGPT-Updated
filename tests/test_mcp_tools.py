@@ -295,13 +295,15 @@ class AuditLoggerToolTests(unittest.TestCase):
 
 
 class ServerRegistrationTests(unittest.TestCase):
-    def test_all_five_tools_registered(self) -> None:
+    def test_all_supported_tools_registered(self) -> None:
         from mcp_server import server
 
         names = set(server.mcp._tool_manager._tools.keys())
         self.assertEqual(
             names,
             {
+                "health",
+                "complete_request",
                 "prompt_analysis",
                 "jailbreak_detection",
                 "content_moderation",

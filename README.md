@@ -216,7 +216,7 @@ Available environment variables:
 | `GUARDGPT_PROJECT_ROOT` | auto-detected | Project root for `logs/` and `data/` resolution |
 | `GUARDGPT_DATASET` | auto-detected | Optional dataset path override |
 | `GUARDGPT_ALLOW_MODEL_DOWNLOAD` | disabled | Set to `1` to allow downloading a missing embedding model |
-| `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama backend used by the legacy GuardEngine |
+| `OLLAMA_URL` | `http://127.0.0.1:11434` | Ollama backend used for generation and output review |
 | `OLLAMA_MODEL` | `llama3` | Ollama model |
 | `OLLAMA_TIMEOUT` | `120` | Ollama request timeout (seconds) |
 | `OLLAMA_TEMPERATURE` | `0.2` | Ollama sampling temperature |
@@ -254,16 +254,16 @@ Runs the canonical demo matrix:
 - MIXED-RISK
 - EMPTY
 
-### Legacy GuardEngine mode (preserved for compatibility)
+### CLI chat and status
 
 ```bash
-# Interactive legacy chat
+# Interactive chat
 python main.py
 
-# Legacy demo
+# Demo matrix
 python main.py --demo
 
-# Legacy status
+# Dependency status
 python main.py --status
 ```
 
@@ -388,8 +388,8 @@ When using the complete request path, GuardGPT:
 7. Audits the candidate in a separate structured model call. Unsafe or irrelevant answers allow one regeneration and another audit.
 8. Writes one final audit event before returning the answer. A log failure withholds the answer.
 
-The supported MCP entry point is `complete_request`. The CLI uses it, and the legacy
-`GuardEngine` delegates to the same implementation. The original five report-only tools and
+The supported MCP entry point is `complete_request`. The CLI uses it, and the
+compatibility `GuardEngine` delegates to the same implementation. The original five report-only tools and
 LangGraph report-only workflow remain available for compatibility.
 
 ## Ollama setup
